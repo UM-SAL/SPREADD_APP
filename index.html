@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>S.P.R.E.A.D.D. — UM Spatial Analysis Lab</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@stlite/browser@0.76.0/build/stlite.css"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import { mount } from "https://cdn.jsdelivr.net/npm/@stlite/browser@0.76.0/build/stlite.js";
+
+      mount(
+        {
+          requirements: [
+            "folium",
+            "streamlit-folium",
+            "geopandas",
+            "pyogrio",
+            "numpy",
+            "pandas",
+            "shapely",
+            "pyproj",
+            "matplotlib",
+          ],
+          entrypoint: "app.py",
+          files: {
+            "app.py": { url: "./app.py" },
+            "rebekahs_model.py": { url: "./rebekahs_model.py" },
+            "r2_data.py": { url: "./r2_data.py" },
+            "Species_List 1(Updated Management Actions).csv": {
+              url: "./Species_List%201(Updated%20Management%20Actions).csv",
+            },
+            "Species_List 1(Final Output).csv": {
+              url: "./Species_List%201(Final%20Output).csv",
+            },
+            "Species_List 1(Citations).csv": {
+              url: "./Species_List%201(Citations).csv",
+            },
+            "SPREADD_diagram_v2.png": { url: "./SPREADD_diagram_v2.png" },
+          },
+        },
+        document.getElementById("root"),
+      );
+    </script>
+  </body>
+</html>

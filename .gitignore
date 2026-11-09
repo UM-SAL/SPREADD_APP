@@ -1,0 +1,27 @@
+# SECRETS — never commit the Cloudflare R2 keys
+credentials.txt
+*.secret
+.env
+
+# IDE history files
+.history/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

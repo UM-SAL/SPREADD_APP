@@ -1,0 +1,28 @@
+Species,Sources
+Blueweed,https://www.nwcb.wa.gov/weeds/blueweed
+Blueweed,https://plants.usda.gov/DocumentLibrary/plantguide/pdf/pg_ecvu.pdf
+Cheatgrass,http://misin.msu.edu/facts/detail/?project=NA&id=247&cname=Cheatgrass
+Cheatgrass,https://store.msuextension.org/publications/AgandNaturalResources/MT200811AG.pdf
+Cheatgrass,https://www.fs.usda.gov/database/feis/plants/graminoid/brotec/all.html
+Common Buckthorn,https://mnfi.anr.msu.edu/invasive-species/CommonBuckthornBCP.pdf
+Common Buckthorn,https://apps.msuextension.org/montguide/guide.html?sku=MT201708AG
+Common Tansy,https://www.nwcb.wa.gov/images/weeds/Tanacetum_vulgare_WF-2.pdf
+Dalmatian Toadflax,https://www.fs.usda.gov/sites/nfs/files/legacy-media/r03/Dalmatian%20and%20Yellow%20Toadflaxes%20field%20guide%202017.pdf
+Japanese Brome,https://www.sciencedirect.com/science/article/pii/S1550742423000441
+Japanese Brome,https://www.fs.usda.gov/database/feis/plants/graminoid/brojap/all.html
+Leafy Spurge,https://plants.usda.gov/DocumentLibrary/plantguide/pdf/pg_eues.pdf
+Leafy Spurge,https://www.jeffco.us/2406/Leafy-Spurge
+Oxeye Daisy,https://apps.msuextension.org/montguide/guide.html?sku=MT200002AG
+Rush Skeletonweed,https://www.nwcb.wa.gov/weeds/rush-skeletonweed
+Rush Skeletonweed,https://plants.usda.gov/DocumentLibrary/plantguide/pdf/pg_chju.pdf
+Spotted Knapweed,https://plants.usda.gov/DocumentLibrary/plantguide/pdf/pg_cest8.pdf
+Spotted Knapweed,https://store.msuextension.org/publications/AgandNaturalResources/EB0204.pdf
+Sulfur Cinquefoil,https://www.fs.usda.gov/database/feis/plants/forb/potrec/all.html
+Whitetop,https://www.montana.edu/extension/invasiveplants/documents/publications/extension_publications/whitetop.pdf
+Yellow Toadflax,https://agsci.colostate.edu/agbio/ipm-pests/yellow-toadflax/
+Yellow Toadflax,https://www.fs.usda.gov/sites/nfs/files/legacy-media/r03/Dalmatian%20and%20Yellow%20Toadflaxes%20field%20guide%202017.pdf
+Data layers,"Habitat suitability (A) — INHABIT: Jarnevich et al. 2024. INHABIT: a web tool for invasive plant management across the contiguous United States. NeoBiota 96:261-278. https://doi.org/10.3897/neobiota.96.134842"
+Data layers,"Human influence (D) — Human Influence Index (HII): Wildlife Conservation Society (WCS) & CIESIN, Columbia University. 2005. Last of the Wild Project, v2: Global Human Influence Index. NASA SEDAC. https://doi.org/10.7927/H4BP00QC"
+Data layers,"Biodiversity intactness (D) — BII: Newbold et al. 2016. Has land use pushed terrestrial biodiversity beyond the planetary boundary? Science 353:288-291. https://doi.org/10.1126/science.aaf2201 (global map: Natural History Museum, https://data.nhm.ac.uk/dataset/global-map-of-the-biodiversity-intactness-index-from-newbold-et-al-2016-science)"
+Data layers,"Climate velocity (D) — AdaptWest velocity of climate change grids (CMIP6): https://adaptwest.databasin.org/pages/adaptwest-velocitywna/ ; concept: Loarie et al. 2009. The velocity of climate change. Nature 462:1052-1055. https://doi.org/10.1038/nature08649"
+General references,https://www.nrcs.usda.gov/plantmaterials/mtpmstn7819.pdf

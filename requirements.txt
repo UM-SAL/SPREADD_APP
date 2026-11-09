@@ -1,0 +1,14 @@
+# Browser build (stlite/Pyodide) declares its own packages in index.html.
+# This file is only for running app.py in DESKTOP Streamlit (python -m streamlit run app.py)
+# for local testing. No rasterio / rasterstats / huggingface_hub needed — rasters are
+# fetched as pre-aligned tiles from Cloudflare R2 (see r2_data.py).
+streamlit>=1.32
+folium>=0.14
+streamlit-folium>=0.15
+geopandas>=1.0
+pyogrio>=0.7
+pyproj>=3.6
+shapely>=2.0
+numpy>=1.26
+pandas>=2.0
+matplotlib>=3.7
