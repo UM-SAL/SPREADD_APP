@@ -460,7 +460,14 @@ if input_mode == "Upload feature":
                 uploaded_gdf_4326["__fid__"] = uploaded_gdf["__fid__"]
 
                 st.success(f"Loaded {len(uploaded_gdf)} polygon feature(s) from {uploaded_file.name}.")
-                _attr_df = uploaded_gdf.drop(columns="geometry", errors="ignore")
+                _attr_df = uploaded_gdf.drop(columns="geometry", errors="ignore").copy()
+                # stlite/Arrow can render st.data_editor blank when a column has a dtype it
+                # can't serialize (FileGDB OBJECTID/Shape_* numerics, WKB-bytes fields, etc.).
+                # These attributes are shown as text, so coerce everything (except the internal
+                # id) to strings for safe rendering in the browser.
+                for _c in _attr_df.columns:
+                    if _c != "__fid__":
+                        _attr_df[_c] = _attr_df[_c].astype("string").fillna("")
                 _edited_flag = (
                     "upload_attr_edits" in st.session_state
                     and st.session_state["upload_attr_edits"].get("file") == uploaded_file.name
@@ -626,6 +633,11 @@ if input_mode == "Upload feature":
             # that feedback caused the first selection to revert to blank (bug #1).
             treat_store = dict(st.session_state.get("selected_treatment_map", {}))
             sel["__fid__"] = sel["__fid__"].astype(str)
+            # Coerce display-only attribute columns to strings so st.data_editor renders in
+            # stlite (Arrow rejects some FileGDB dtypes / WKB bytes -> blank grid). The
+            # editable model_treatment column is added separately below.
+            for _c in list(sel.columns):
+                sel[_c] = sel[_c].astype("string").fillna("")
             sel["model_treatment"] = sel["__fid__"].map(treat_store).fillna("")
             st.session_state["_sel_treat_fid_order"] = sel["__fid__"].tolist()
 
@@ -2029,7 +2041,7 @@ st.divider()
 st.subheader("How the model works")
 _diagram_path = _find_decision_tree_image()  # bundled PNG in the repo root
 if _diagram_path:
-    st.image(_diagram_path, use_column_width=True)
+    st.image(_diagram_path, use_container_width=True)
     with st.expander("Code-generated version (auto-matches the model constants)", expanded=False):
         _show_auto_diagram()
 else:
