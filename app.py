@@ -627,16 +627,6 @@ if input_mode == "Upload feature":
                 uploaded_gdf_4326["__fid__"].isin(st.session_state.upload_selected_ids)
             ].drop(columns="geometry")
 
-            # TEMP diagnostic (remove later): shows why the treatment UI may be empty.
-            with st.expander("🔧 Selection debug", expanded=True):
-                st.write({
-                    "selected_ids": list(st.session_state.upload_selected_ids),
-                    "selected_ids_types": [type(x).__name__ for x in st.session_state.upload_selected_ids],
-                    "fid_dtype": str(uploaded_gdf_4326["__fid__"].dtype),
-                    "fid_sample": uploaded_gdf_4326["__fid__"].head().tolist(),
-                    "matched_rows": int(len(sel)),
-                    "sel_columns": list(sel.columns),
-                })
 
             # Prefill treatments from a persistent __fid__ -> treatment store.
             # Edits are applied via the on_change callback below (which writes to this
