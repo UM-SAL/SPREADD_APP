@@ -468,22 +468,12 @@ def build_species_scores_from_rasters(  # combine A/B/C/D into scores
 
 # -------------------- Per-pixel threat maps (A+B+C+D per cell) --------------------
 
-class _GridTransform(tuple):
-    """Minimal affine stand-in exposing .a/.b/.c/.d/.e/.f (GDAL-style: a=res_x, c=minx, f=maxy).
+from collections import namedtuple
 
-    The browser build has no rasterio.Affine; app.py only reads .a/.c/.f off this.
-    """
-    __slots__ = ()
-
-    def __new__(cls, a, b, c, d, e, f):
-        return super().__new__(cls, (a, b, c, d, e, f))
-
-    a = property(lambda s: s[0])
-    b = property(lambda s: s[1])
-    c = property(lambda s: s[2])
-    d = property(lambda s: s[3])
-    e = property(lambda s: s[4])
-    f = property(lambda s: s[5])
+# Minimal affine stand-in exposing .a/.b/.c/.d/.e/.f (GDAL-style: a=res_x, c=minx, f=maxy).
+# A namedtuple (not a tuple subclass with a custom __new__) so it survives the pickling
+# that st.cache_data does on the per-pixel result. app.py reads .a/.c/.f off this.
+_GridTransform = namedtuple("_GridTransform", ["a", "b", "c", "d", "e", "f"])
 
 
 def compute_per_pixel_total(
