@@ -1940,6 +1940,43 @@ def render_per_pixel_maps():
     except Exception as exc:
         st.caption(f"Grid export unavailable: {exc}")
 
+    # Interactive satellite view: contextily can't fetch tiles in the browser, so overlay
+    # the threat grid on a Folium map (Esri World Imagery loads directly in the browser).
+    try:
+        import base64
+        from shapely.geometry import box as _box
+
+        st.markdown("**Interactive satellite view**")
+        sp_map = st.selectbox(
+            "Species to overlay on satellite imagery", ordered, key="viz_folium_species"
+        )
+        data = _np.ma.masked_invalid(results[sp_map])
+        rgba = cmap(fixed_norm(data))  # (h, w, 4) floats, fixed 0-2 scale (matches grid above)
+        rgba[..., 3] = _np.where(_np.isfinite(results[sp_map]), 0.75, 0.0)  # transparent where no data
+        png_buf = io.BytesIO()
+        plt.imsave(png_buf, (rgba * 255).astype("uint8"), format="png")
+        data_uri = "data:image/png;base64," + base64.b64encode(png_buf.getvalue()).decode()
+
+        # Grid bounds (EPSG:5070) -> lat/lon for the overlay. Small polygons: skew negligible.
+        w, s, e, n = (
+            gpd.GeoSeries([_box(minx, miny, maxx, maxy)], crs=meta["crs"])
+            .to_crs("EPSG:4326")
+            .total_bounds
+        )
+        fmap = folium.Map(tiles=None)
+        folium.TileLayer(
+            tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            attr="Esri", name="Satellite",
+        ).add_to(fmap)
+        folium.raster_layers.ImageOverlay(
+            image=data_uri, bounds=[[s, w], [n, e]], opacity=0.75, name=sp_map
+        ).add_to(fmap)
+        fmap.fit_bounds([[s, w], [n, e]])
+        st_folium(fmap, use_container_width=True, height=500, key="viz_folium_map")
+        st.caption("Overlay is reprojected from the ~98 m grid; alignment is approximate.")
+    except Exception as exc:
+        st.caption(f"Satellite overlay unavailable: {exc}")
+
 
 try:
     render_per_pixel_maps()
