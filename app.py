@@ -1812,9 +1812,13 @@ def render_per_pixel_maps():
         st.caption("Select at least one species.")
         return
 
-    col_a, col_b = st.columns(2)
-    show_basemap = col_a.checkbox("Satellite basemap", value=True, key="viz_basemap")
-    auto_scale = col_b.checkbox(
+    # NOTE: the "Satellite basemap" checkbox is commented out for now — contextily can't
+    # fetch map tiles in Pyodide, so it did nothing on the matplotlib grid. The interactive
+    # Folium view below provides a working satellite basemap. Revisit later.
+    # col_a, col_b = st.columns(2)
+    # show_basemap = col_a.checkbox("Satellite basemap", value=True, key="viz_basemap")
+    show_basemap = False
+    auto_scale = st.checkbox(
         "Auto-scale each map (show within-polygon detail)", value=False, key="viz_autoscale"
     )
 
