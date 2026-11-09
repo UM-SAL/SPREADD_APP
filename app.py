@@ -660,49 +660,34 @@ if input_mode == "Upload feature":
                 treat_store = store
                 sel["model_treatment"] = sel["__fid__"].map(store).fillna("")
 
-            def _apply_selected_treatment_edits():
-                state = st.session_state.get("selected_treatment_editor", {})
-                edits = state.get("edited_rows", {}) if isinstance(state, dict) else {}
-                order = st.session_state.get("_sel_treat_fid_order", [])
-                store = dict(st.session_state.get("selected_treatment_map", {}))
-                for pos, changes in edits.items():
-                    if "model_treatment" in changes:
-                        i = int(pos)
-                        if 0 <= i < len(order):
-                            store[order[i]] = changes["model_treatment"]
-                st.session_state["selected_treatment_map"] = store
-
-            # Build column config: non-geometry fields read-only except treatment
-            column_config = {
-                "model_treatment": st.column_config.SelectboxColumn(
-                    "Model treatment (required)",
-                    options=[""] + VALID_MODEL_TREATMENTS,
-                    required=True,
-                    disabled=same_for_all,  # when on, driven by the single dropdown above
-                ),
-                "__fid__": st.column_config.TextColumn("__fid__", disabled=True),
-            }
-            # Make other columns read-only text
-            for c in sel.columns:
-                if c not in column_config:
-                    column_config[c] = st.column_config.TextColumn(c, disabled=True)
-
-            # Show treatment first; hide the internal __fid__ column from the user (#21).
-            column_order = ["model_treatment"] + [
-                c for c in sel.columns if c not in ("model_treatment", "__fid__")
-            ]
-
-            st.data_editor(
-                sel,
-                use_container_width=True,
-                hide_index=True,
-                height=300,
-                num_rows="fixed",
-                column_config=column_config,
-                column_order=column_order,
-                key="selected_treatment_editor",
-                on_change=_apply_selected_treatment_edits,
-            )
+            # Per-polygon treatment assignment via plain selectboxes. (st.data_editor can
+            # render as a blank grid under stlite/Pyodide, so we avoid it here.) The
+            # "same for all" shortcut above still drives every polygon when enabled.
+            order = sel["__fid__"].tolist()
+            # Label each row with its first few attribute values, if the upload has any.
+            _label_cols = [c for c in sel.columns if c not in ("__fid__", "model_treatment")]
+            store = dict(st.session_state.get("selected_treatment_map", {}))
+            _opts = [""] + VALID_MODEL_TREATMENTS
+            st.caption("Assign a model treatment to each selected polygon:")
+            for _f in order:
+                _rowmatch = sel.loc[sel["__fid__"] == _f]
+                if _label_cols and not _rowmatch.empty:
+                    _lbl = " | ".join(str(_rowmatch.iloc[0][c]) for c in _label_cols[:3])
+                else:
+                    _lbl = f"Polygon {_f}"
+                _cur = store.get(_f, "")
+                _idx = _opts.index(_cur) if _cur in _opts else 0
+                _val = st.selectbox(
+                    _lbl or f"Polygon {_f}",
+                    options=_opts,
+                    index=_idx,
+                    key=f"sel_treat_{_f}",
+                    disabled=same_for_all,  # when on, the single dropdown above governs
+                )
+                if not same_for_all:
+                    store[_f] = _val
+            st.session_state["selected_treatment_map"] = store
+            treat_store = store
 
             # Publish the current selection's treatments (from the store) for the
             # ready-check and run block.
