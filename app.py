@@ -469,27 +469,31 @@ with tab_instructions:
         "place — the map, your selections and results stay put."
     )
 
+    _GIFS = f"{R2_BASE_URL.rstrip('/')}/gifs"
+
     st.markdown("#### 1. Choose how to define your treatment area")
     st.markdown(
-        "On the **Map** tab, pick **Draw feature** to sketch polygon(s), or **Upload "
-        "feature** to load a shapefile (.zip), GeoJSON, GeoPackage (.gpkg) or file "
-        "geodatabase (.gdb)."
+        "On the **Map** tab, either **draw** polygon(s) on the map, or **upload** a "
+        "shapefile (.zip), GeoJSON, GeoPackage (.gpkg) or file geodatabase (.gdb)."
     )
-    st.info("Demo clip for Step 1 will appear here.")
+    st.markdown("*Option A — draw a feature:*")
+    st.image(f"{_GIFS}/Draw_Feature.gif", use_container_width=True)
+    st.markdown("*Option B — upload a feature:*")
+    st.image(f"{_GIFS}/Upload_Polygon.gif", use_container_width=True)
 
     st.markdown("#### 2. Select your area(s)")
     st.markdown(
         "If you uploaded data, click polygons on the map to select them (or choose "
         "*All polygons*) and pick the unique-ID column. Drawn polygons are used directly."
     )
-    st.info("Demo clip for Step 2 will appear here.")
+    st.image(f"{_GIFS}/Select_Polygons.gif", use_container_width=True)
 
-    st.markdown("#### 3. Set the model inputs")
+    st.markdown("#### 3. Assign a treatment")
     st.markdown(
-        "Assign a management action (treatment) to each area and choose the proliferation "
-        "column under **Model Inputs**."
+        "Choose a management action (treatment) for each area. The proliferation column "
+        "(C) is set automatically under **Model Inputs**."
     )
-    st.info("Demo clip for Step 3 will appear here.")
+    st.image(f"{_GIFS}/Select_Actions.gif", use_container_width=True)
 
     st.markdown("#### 4. Run and review")
     st.markdown(
@@ -497,13 +501,7 @@ with tab_instructions:
         "the per-pixel threat maps, and the interactive satellite view. Use the download "
         "buttons to export results."
     )
-    st.info("Demo clip for Step 4 will appear here.")
-
-    st.caption(
-        "The clip placeholders above are ready for short demo GIFs (one per step). "
-        "Record each step, export as a GIF, and host the files (e.g. on the project's "
-        "Cloudflare R2 bucket) to drop them in."
-    )
+    st.image(f"{_GIFS}/Run_Prediction.gif", use_container_width=True)
 
 with tab_data:
     st.subheader("Model input data layers")
