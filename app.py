@@ -1211,7 +1211,23 @@ with tab_map:
             for msg in existing_polygon_errors:
                 st.error(msg)
 
-    run_prediction = st.button("Run prediction", disabled=not ready_to_run, key="run_prediction")
+    # Use an on_click callback to set a session-state flag instead of relying on the
+    # button's return value, which is unreliable for st.button inside st.tabs.
+    def _mark_run():
+        st.session_state["_run_requested"] = True
+
+    st.button(
+        "Run prediction",
+        disabled=not ready_to_run,
+        key="run_prediction",
+        on_click=_mark_run,
+        type="primary",
+    )
+    if not ready_to_run:
+        st.caption(
+            "Run is disabled until: a treatment is chosen, a C (proliferation) column is "
+            "available, and at least one polygon is drawn or selected."
+        )
 
     # Show the risk decision tree diagram below the button. The image ships in the repo root.
     def _find_decision_tree_image() -> str | None:
@@ -1425,7 +1441,7 @@ with tab_map:
             return None
 
 
-    if run_prediction:
+    if st.session_state.pop("_run_requested", False):
         # Original user ID column name, restored in the output tables (bug #7).
         # Overridden below for uploaded polygons; stays "zone_id" for drawn shapes.
         id_display_name = "zone_id"
