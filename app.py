@@ -398,11 +398,17 @@ VALID_MODEL_TREATMENTS = base_treatments[:]  # only the real treatments (no plac
 
 
 # -------------------- Page tabs (Instructions / Map / Data Layers / About) --------------------
-tab_instructions, tab_map, tab_data, tab_about = st.tabs(
-    ["Instructions", "Map", "Data Layers", "About"]
+# st.tabs suppresses widget reruns inside tabs in this stlite build (buttons never fire),
+# so use a top-level radio "banner" for sections instead. Each section is gated by _nav.
+_nav = st.radio(
+    "Section",
+    ["Instructions", "Map", "Data Layers", "About"],
+    horizontal=True,
+    key="main_nav",
+    label_visibility="collapsed",
 )
 
-with tab_instructions:
+if _nav == "Instructions":
     st.subheader("How to use this tool")
     st.markdown(
         "S.P.R.E.A.D.D. estimates the risk of spreading invasive plants when a "
@@ -447,7 +453,7 @@ with tab_instructions:
         "Cloudflare R2 bucket) to drop them in."
     )
 
-with tab_data:
+if _nav == "Data Layers":
     st.subheader("Model input data layers")
     st.markdown(
         "The spatial inputs below feed the model. All are resampled onto a common "
@@ -472,7 +478,7 @@ with tab_data:
         "Note the HII layer is from 2005. Full citations are on the About tab."
     )
 
-with tab_map:
+if _nav == "Map":
     st.subheader("Treatment Area(s)")
     input_mode = st.radio(
         "Choose geometry input method",
@@ -1211,31 +1217,8 @@ with tab_map:
             for msg in existing_polygon_errors:
                 st.error(msg)
 
-    # st.button is inert inside stlite tabs. EXPERIMENT: test which trigger actually fires
-    # so we can keep the one that works and drop the rest.
-    def _request_run():
-        st.session_state["_run_requested"] = True
-
-    def _btn_cb():
-        _request_run()
-        st.session_state["_cnt_btn"] = st.session_state.get("_cnt_btn", 0) + 1
-
-    _c_btn, _c_form, _c_tog = st.columns(3)
-    with _c_btn:
-        st.button("Run (button)", disabled=not ready_to_run, key="run_btn", on_click=_btn_cb)
-    with _c_form:
-        with st.form("run_form"):
-            if st.form_submit_button("Run (form)", disabled=not ready_to_run):
-                _request_run()
-                st.session_state["_cnt_form"] = st.session_state.get("_cnt_form", 0) + 1
-    with _c_tog:
-        if st.toggle("Run (toggle)", key="run_toggle", disabled=not ready_to_run):
-            _request_run()
-            st.session_state["_cnt_tog"] = st.session_state.get("_cnt_tog", 0) + 1
-    st.caption(
-        f"(debug) counters — button={st.session_state.get('_cnt_btn', 0)} "
-        f"form={st.session_state.get('_cnt_form', 0)} "
-        f"toggle={st.session_state.get('_cnt_tog', 0)} · ready_to_run={ready_to_run}"
+    run_prediction = st.button(
+        "Run prediction", disabled=not ready_to_run, key="run_prediction", type="primary"
     )
     if not ready_to_run:
         st.caption(
@@ -1455,13 +1438,12 @@ with tab_map:
             return None
 
 
-    if st.session_state.pop("_run_requested", False):
+    if run_prediction:
         # Original user ID column name, restored in the output tables (bug #7).
         # Overridden below for uploaded polygons; stays "zone_id" for drawn shapes.
         id_display_name = "zone_id"
         # Show a small toast message at the top.
         st.toast("Prediction started.")
-        st.info("Run started — computing predictions…")  # TEMP: visible proof the run block ran
 
         if bulk_mode:
             # BULK: use selected polygons from the uploaded dataset
@@ -2192,7 +2174,7 @@ with tab_map:
     except Exception as _viz_exc:
         st.caption(f"Per-pixel maps unavailable: {_viz_exc}")
 
-with tab_about:
+if _nav == "About":
     # -------------------- How the model works --------------------
     st.divider()
     st.subheader("How the model works")
@@ -2268,7 +2250,7 @@ with tab_about:
     except Exception as exc:
         st.caption(f"Unable to load citations: {exc}")
 
-with tab_data:
+if _nav == "Data Layers":
     # -------------------- Dataset connection status (bottom of page) --------------------
     try:
         ds_status = check_dataset_connection()
