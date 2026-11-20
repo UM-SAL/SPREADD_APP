@@ -159,10 +159,22 @@ def _results_to_long_gdf(species_df, zones_gdf, uid_name="zone_id"):
         "total_score": "total", "risk_class": "risk",
         "variance_class": "confidence", "missing_inputs": "missing",
     }
-    keep = [c for c in cols if c in species_df.columns]
-    sdf = species_df[keep].rename(columns={k: cols[k] for k in keep}).copy()
+    # The id column in species_df is "zone_id"; fall back to uid_name if a rename happened.
+    id_col = "zone_id" if "zone_id" in species_df.columns else (
+        uid_name if uid_name in species_df.columns else None
+    )
+    if id_col is None:
+        raise KeyError("results have no zone_id/id column to join on")
+    keep = [id_col] + [c for c in cols if c != "zone_id" and c in species_df.columns]
+    rename_map = {k: cols[k] for k in keep if k in cols}
+    rename_map[id_col] = "zone_id"
+    sdf = species_df[keep].rename(columns=rename_map).copy()
     sdf["zone_id"] = sdf["zone_id"].astype(str)
-    geom = zones_gdf[["zone_id", "geometry"]].copy()
+    # Use the active geometry column name (uploads/GeoPackages may not call it "geometry").
+    gcol = zones_gdf.geometry.name
+    geom = zones_gdf[["zone_id", gcol]].copy()
+    if gcol != "geometry":
+        geom = geom.rename(columns={gcol: "geometry"})
     geom["zone_id"] = geom["zone_id"].astype(str)
     merged = sdf.merge(geom, on="zone_id", how="left")
     gdf = gpd.GeoDataFrame(merged, geometry="geometry", crs=zones_gdf.crs)
@@ -230,8 +242,9 @@ def _shapefile_zip_bytes(gdf):
                 parts = []
                 for poly in polys:
                     poly = orient(poly, sign=-1.0)  # exterior CW, holes CCW (shapefile spec)
-                    parts.append([(x, y) for x, y in poly.exterior.coords])
-                    parts += [[(x, y) for x, y in r.coords] for r in poly.interiors]
+                    # Keep only X,Y (uploads may carry Z, which pyshp POLYGON can't take).
+                    parts.append([(c[0], c[1]) for c in poly.exterior.coords])
+                    parts += [[(c[0], c[1]) for c in r.coords] for r in poly.interiors]
                 w.poly(parts)
             w.record(*[(None if pd.isna(row[c]) else row[c]) for c in attr_cols])
         w.close()
@@ -1914,7 +1927,7 @@ with tab_map:
             }
         except Exception as _vexc:
             st.session_state.pop("vector_exports", None)
-            st.caption(f"Polygon export unavailable: {_vexc}")
+            st.warning(f"Polygon export unavailable — {type(_vexc).__name__}: {_vexc}")
         _render_vector_downloads()
     # If not running but cached results exist, display them so they persist across reruns
     elif "results_cache" in st.session_state:
