@@ -148,6 +148,47 @@ def load_citations_table() -> pd.DataFrame:
     """Load citations table."""
     return load_csv_latin1(CITATIONS_PATH)
 
+
+def _results_to_long_gdf(species_df, zones_gdf, uid_name="zone_id"):
+    """Join per-polygon x per-species results to geometry in LONG format (one row per
+    polygon-species; geometry repeated). Column names are kept <=10 chars for Shapefiles."""
+    cols = {
+        "zone_id": "zone_id", "species": "species",
+        "A_habitat": "A_habitat", "B_action": "B_action",
+        "C_proliferation": "C_prolif", "D_resistance": "D_resist",
+        "total_score": "total", "risk_class": "risk",
+        "variance_class": "confidence", "missing_inputs": "missing",
+    }
+    keep = [c for c in cols if c in species_df.columns]
+    sdf = species_df[keep].rename(columns={k: cols[k] for k in keep}).copy()
+    sdf["zone_id"] = sdf["zone_id"].astype(str)
+    geom = zones_gdf[["zone_id", "geometry"]].copy()
+    geom["zone_id"] = geom["zone_id"].astype(str)
+    merged = sdf.merge(geom, on="zone_id", how="left")
+    gdf = gpd.GeoDataFrame(merged, geometry="geometry", crs=zones_gdf.crs)
+    if uid_name and uid_name != "zone_id":
+        gdf = gdf.rename(columns={"zone_id": str(uid_name)[:10]})
+    return gdf
+
+
+def _vector_export_bytes(gdf):
+    """Return (gpkg_bytes, shp_zip_bytes) for a GeoDataFrame, written via fiona (browser-safe)."""
+    import io as _io, os as _os, tempfile as _tf, zipfile as _zip
+
+    with _tf.TemporaryDirectory() as td:
+        gpkg_path = _os.path.join(td, "spreadd_results.gpkg")
+        gdf.to_file(gpkg_path, driver="GPKG", engine="fiona")
+        gpkg_bytes = open(gpkg_path, "rb").read()
+    with _tf.TemporaryDirectory() as td:
+        gdf.to_file(_os.path.join(td, "spreadd_results.shp"), driver="ESRI Shapefile", engine="fiona")
+        b = _io.BytesIO()
+        with _zip.ZipFile(b, "w", _zip.ZIP_DEFLATED) as zf:
+            for f in _os.listdir(td):
+                zf.write(_os.path.join(td, f), f)
+        shp_zip_bytes = b.getvalue()
+    return gpkg_bytes, shp_zip_bytes
+
+
 def _ensure_gdf_crs(gdf: gpd.GeoDataFrame, default_crs: str = "EPSG:4326") -> gpd.GeoDataFrame:
     """Ensure a GeoDataFrame has a CRS; if missing, set a default (no reprojection)."""
     if gdf.crs is None:
@@ -1783,6 +1824,31 @@ with tab_map:
             key="dl_detailed",
             help="Includes per-polygon × per-species scores with zonal inputs merged.",
         )
+
+        # Polygon (vector) download: LONG format, one feature per polygon x species.
+        try:
+            _long_gdf = _results_to_long_gdf(species_df, zones_gdf, out_uid_field)
+            _gpkg_b, _shp_b = _vector_export_bytes(_long_gdf)
+            st.markdown("**Download result polygons** (one feature per polygon × species)")
+            _pc1, _pc2 = st.columns(2)
+            _pc1.download_button(
+                "GeoPackage (.gpkg)",
+                data=_gpkg_b,
+                file_name="spreadd_results.gpkg",
+                mime="application/geopackage+sqlite3",
+                key="dl_gpkg",
+                use_container_width=True,
+            )
+            _pc2.download_button(
+                "Shapefile (.zip)",
+                data=_shp_b,
+                file_name="spreadd_results_shp.zip",
+                mime="application/zip",
+                key="dl_shp",
+                use_container_width=True,
+            )
+        except Exception as _vexc:
+            st.caption(f"Polygon export unavailable: {_vexc}")
     # If not running but cached results exist, display them so they persist across reruns
     elif "results_cache" in st.session_state:
         cache = st.session_state["results_cache"]
@@ -1923,7 +1989,7 @@ with tab_map:
         import numpy as _np
         import matplotlib.pyplot as plt
         from matplotlib import cm, colors
-        from rebekahs_model import array_to_asc_bytes
+        from rebekahs_model import array_to_asc_bytes, array_to_geotiff_bytes
 
         ctx_mod = None
         if show_basemap:
@@ -2039,10 +2105,31 @@ with tab_map:
         st.pyplot(fig)
         plt.close(fig)
 
-        # --- Download the per-pixel threat grids ---
+        # --- Download the per-pixel threat grids (GeoTIFF + ESRI ASCII) ---
+        st.markdown("**Download per-pixel grids** (one file per shown species, EPSG:5070)")
+        _dl_tif, _dl_asc = st.columns(2)
         try:
-            buf = io.BytesIO()
-            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            _tif_buf = io.BytesIO()
+            with zipfile.ZipFile(_tif_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                for sp in ordered:
+                    safe = re.sub(r"[^A-Za-z0-9]+", "_", sp)
+                    zf.writestr(
+                        f"threat_zone{sel_zone}_{safe}.tif",
+                        array_to_geotiff_bytes(results[sp], meta["transform"], 5070),
+                    )
+            _dl_tif.download_button(
+                "GeoTIFF (.tif, .zip)",
+                data=_tif_buf.getvalue(),
+                file_name=f"per_pixel_threat_zone_{sel_zone}_geotiff.zip",
+                mime="application/zip",
+                key="viz_dl_tif",
+                use_container_width=True,
+            )
+        except Exception as exc:
+            _dl_tif.caption(f"GeoTIFF export unavailable: {exc}")
+        try:
+            _asc_buf = io.BytesIO()
+            with zipfile.ZipFile(_asc_buf, "w", zipfile.ZIP_DEFLATED) as zf:
                 for sp in ordered:
                     safe = re.sub(r"[^A-Za-z0-9]+", "_", sp)
                     zf.writestr(
@@ -2051,15 +2138,16 @@ with tab_map:
                     )
                 # Projection sidecar so GIS tools pick up the CRS of the .asc grids.
                 zf.writestr("threat_grids.prj", 'PROJCS["NAD83 / Conus Albers",EPSG:5070]')
-            st.download_button(
-                "Download threat grids (ESRI ASCII .asc, .zip)",
-                data=buf.getvalue(),
-                file_name=f"per_pixel_threat_zone_{sel_zone}.zip",
+            _dl_asc.download_button(
+                "ESRI ASCII (.asc, .zip)",
+                data=_asc_buf.getvalue(),
+                file_name=f"per_pixel_threat_zone_{sel_zone}_asc.zip",
                 mime="application/zip",
-                key="viz_dl_zip",
+                key="viz_dl_asc",
+                use_container_width=True,
             )
         except Exception as exc:
-            st.caption(f"Grid export unavailable: {exc}")
+            _dl_asc.caption(f"ASCII export unavailable: {exc}")
 
 
     try:

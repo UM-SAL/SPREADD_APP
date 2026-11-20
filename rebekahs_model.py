@@ -612,3 +612,32 @@ def array_to_asc_bytes(array, transform, crs=None) -> bytes:
     )
     body = "\n".join(" ".join(f"{v:.6g}" for v in filled[r]) for r in range(nrows))
     return (header + body + "\n").encode("ascii")
+
+
+def array_to_geotiff_bytes(array, transform, crs_epsg: int = 5070) -> bytes:
+    """Encode a 2D float array as an in-memory GeoTIFF using tifffile (pure Python, no GDAL).
+
+    Writes the standard GeoTIFF tags (GeoKeyDirectory + ModelPixelScale + ModelTiepoint)
+    for a north-up grid in the given projected EPSG (default 5070, NAD83 / Conus Albers),
+    with NaN as the GDAL nodata value. Verified to round-trip through rasterio.
+    """
+    import io
+    import tifffile
+
+    arr = np.asarray(array, dtype="float32")
+    sx = float(transform.a)            # pixel size x
+    sy = float(abs(transform.e))       # pixel size y
+    ulx = float(transform.c)           # upper-left x
+    uly = float(transform.f)           # upper-left y
+    # GeoKeyDirectory: (version 1,1,0, num_keys), then key entries:
+    #   GTModelType(1024)=1 (projected), GTRasterType(1025)=1 (area), ProjectedCSType(3072)=epsg
+    geokeys = (1, 1, 0, 3, 1024, 0, 1, 1, 1025, 0, 1, 1, 3072, 0, 1, int(crs_epsg))
+    extratags = [
+        (34735, "H", len(geokeys), geokeys),              # GeoKeyDirectoryTag
+        (33550, "d", 3, (sx, sy, 0.0)),                   # ModelPixelScaleTag
+        (33922, "d", 6, (0.0, 0.0, 0.0, ulx, uly, 0.0)),  # ModelTiepointTag (0,0 -> ul)
+        (42113, "s", 0, "nan"),                           # GDAL_NODATA
+    ]
+    buf = io.BytesIO()
+    tifffile.imwrite(buf, arr, extratags=extratags)
+    return buf.getvalue()
