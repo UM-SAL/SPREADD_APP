@@ -172,39 +172,30 @@ def _results_to_long_gdf(species_df, zones_gdf, uid_name="zone_id"):
 
 
 def _render_vector_downloads():
-    """Render the GeoPackage + Shapefile download buttons from cached export bytes, so they
-    persist across the rerun that a download-button click triggers."""
+    """Render the polygon-results download button from cached export bytes, so it persists
+    across the rerun that a download-button click triggers."""
     ex = st.session_state.get("vector_exports")
     if not ex:
         return
     st.markdown("**Download result polygons** (one feature per polygon × species)")
-    _pc1, _pc2 = st.columns(2)
-    _pc1.download_button(
-        "GeoPackage (.gpkg)", data=ex["gpkg"], file_name="spreadd_results.gpkg",
-        mime="application/geopackage+sqlite3", key="dl_gpkg", use_container_width=True,
-    )
-    _pc2.download_button(
-        "Shapefile (.zip)", data=ex["shp"], file_name="spreadd_results_shp.zip",
-        mime="application/zip", key="dl_shp", use_container_width=True,
+    st.download_button(
+        "GeoJSON (.geojson)",
+        data=ex["geojson"],
+        file_name="spreadd_results.geojson",
+        mime="application/geo+json",
+        key="dl_geojson",
+        use_container_width=True,
     )
 
 
 def _vector_export_bytes(gdf):
-    """Return (gpkg_bytes, shp_zip_bytes) for a GeoDataFrame, written via fiona (browser-safe)."""
-    import io as _io, os as _os, tempfile as _tf, zipfile as _zip
-
-    with _tf.TemporaryDirectory() as td:
-        gpkg_path = _os.path.join(td, "spreadd_results.gpkg")
-        gdf.to_file(gpkg_path, driver="GPKG", engine="fiona")
-        gpkg_bytes = open(gpkg_path, "rb").read()
-    with _tf.TemporaryDirectory() as td:
-        gdf.to_file(_os.path.join(td, "spreadd_results.shp"), driver="ESRI Shapefile", engine="fiona")
-        b = _io.BytesIO()
-        with _zip.ZipFile(b, "w", _zip.ZIP_DEFLATED) as zf:
-            for f in _os.listdir(td):
-                zf.write(_os.path.join(td, f), f)
-        shp_zip_bytes = b.getvalue()
-    return gpkg_bytes, shp_zip_bytes
+    """Return GeoJSON bytes for a GeoDataFrame (EPSG:4326). Uses geopandas' native to_json
+    (pure Python) — NOT fiona.to_file, which crashes/hangs the Pyodide worker in the browser."""
+    try:
+        gdf = gdf.to_crs("EPSG:4326")
+    except Exception:
+        pass
+    return gdf.to_json().encode("utf-8")
 
 
 def _ensure_gdf_crs(gdf: gpd.GeoDataFrame, default_crs: str = "EPSG:4326") -> gpd.GeoDataFrame:
@@ -1860,8 +1851,7 @@ if _nav == "Map":
         # Build the bytes once and cache them so the buttons survive download-click reruns.
         try:
             _long_gdf = _results_to_long_gdf(species_df, zones_gdf, out_uid_field)
-            _gpkg_b, _shp_b = _vector_export_bytes(_long_gdf)
-            st.session_state["vector_exports"] = {"gpkg": _gpkg_b, "shp": _shp_b}
+            st.session_state["vector_exports"] = {"geojson": _vector_export_bytes(_long_gdf)}
         except Exception as _vexc:
             st.session_state.pop("vector_exports", None)
             st.caption(f"Polygon export unavailable: {_vexc}")
