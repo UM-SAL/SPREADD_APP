@@ -1215,6 +1215,7 @@ with tab_map:
     # button's return value, which is unreliable for st.button inside st.tabs.
     def _mark_run():
         st.session_state["_run_requested"] = True
+        st.session_state["_run_clicks"] = st.session_state.get("_run_clicks", 0) + 1
 
     st.button(
         "Run prediction",
@@ -1223,6 +1224,8 @@ with tab_map:
         on_click=_mark_run,
         type="primary",
     )
+    # TEMP diagnostic: proves whether the button click is registering at all.
+    st.caption(f"(debug) Run clicks registered: {st.session_state.get('_run_clicks', 0)} · ready_to_run={ready_to_run}")
     if not ready_to_run:
         st.caption(
             "Run is disabled until: a treatment is chosen, a C (proliferation) column is "
@@ -1447,6 +1450,7 @@ with tab_map:
         id_display_name = "zone_id"
         # Show a small toast message at the top.
         st.toast("Prediction started.")
+        st.info("Run started — computing predictions…")  # TEMP: visible proof the run block ran
 
         if bulk_mode:
             # BULK: use selected polygons from the uploaded dataset
