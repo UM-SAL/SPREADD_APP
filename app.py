@@ -389,17 +389,11 @@ VALID_MODEL_TREATMENTS = base_treatments[:]  # only the real treatments (no plac
 
 
 # -------------------- Page tabs (Instructions / Map / Data Layers / About) --------------------
-# st.tabs suppresses widget reruns inside tabs in this stlite build (buttons never fire),
-# so use a top-level radio "banner" for sections instead. Each section is gated by _nav.
-_nav = st.radio(
-    "Section",
-    ["Instructions", "Map", "Data Layers", "About"],
-    horizontal=True,
-    key="main_nav",
-    label_visibility="collapsed",
+tab_instructions, tab_map, tab_data, tab_about = st.tabs(
+    ["Instructions", "Map", "Data Layers", "About"]
 )
 
-if _nav == "Instructions":
+with tab_instructions:
     st.subheader("How to use this tool")
     st.markdown(
         "S.P.R.E.A.D.D. estimates the risk of spreading invasive plants when a "
@@ -444,7 +438,7 @@ if _nav == "Instructions":
         "Cloudflare R2 bucket) to drop them in."
     )
 
-if _nav == "Data Layers":
+with tab_data:
     st.subheader("Model input data layers")
     st.markdown(
         "The spatial inputs below feed the model. All are resampled onto a common "
@@ -469,7 +463,7 @@ if _nav == "Data Layers":
         "Note the HII layer is from 2005. Full citations are on the About tab."
     )
 
-if _nav == "Map":
+with tab_map:
     st.subheader("Treatment Area(s)")
     input_mode = st.radio(
         "Choose geometry input method",
@@ -953,6 +947,15 @@ if _nav == "Map":
         user_treatment_col = None     # not used in draw mode
 
         st.subheader("Treatment (drawn polygon)")
+        # Light-red callout until a treatment is picked, to make the required step obvious.
+        if not st.session_state.get("treatment_single", ""):
+            st.markdown(
+                "<div style='background-color:#fdecea;border:1px solid #f5b7b1;"
+                "border-radius:6px;padding:8px 12px;margin-bottom:8px;color:#922b21;'>"
+                "<strong>Required:</strong> after drawing your polygon, pick a treatment "
+                "option below to enable <em>Run prediction</em>.</div>",
+                unsafe_allow_html=True,
+            )
         # Don't pre-select a treatment — start blank so the user must choose (#21).
         default_treatment = st.session_state.get("treatment_single", "")
         if default_treatment not in ([""] + VALID_MODEL_TREATMENTS):
@@ -1968,9 +1971,6 @@ if _nav == "Map":
         # col_a, col_b = st.columns(2)
         # show_basemap = col_a.checkbox("Satellite basemap", value=True, key="viz_basemap")
         show_basemap = False
-        auto_scale = st.checkbox(
-            "Auto-scale each map (show within-polygon detail)", value=False, key="viz_autoscale"
-        )
 
         geom = zones.loc[zones[zid_col].astype(str) == sel_zone, "geometry"].iloc[0]
         with st.spinner("Computing per-pixel threat maps…"):
@@ -2063,6 +2063,9 @@ if _nav == "Map":
 
         # --- All-species side-by-side comparison grid ---
         st.markdown("**All species (side-by-side comparison)**")
+        auto_scale = st.checkbox(
+            "Auto-scale each map (show within-polygon detail)", value=False, key="viz_autoscale"
+        )
         ncols = 4
         nrows = int(_np.ceil(len(ordered) / ncols))
         fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 3, nrows * 3))
@@ -2164,7 +2167,7 @@ if _nav == "Map":
     except Exception as _viz_exc:
         st.caption(f"Per-pixel maps unavailable: {_viz_exc}")
 
-if _nav == "About":
+with tab_about:
     # -------------------- How the model works --------------------
     st.divider()
     st.subheader("How the model works")
@@ -2240,7 +2243,7 @@ if _nav == "About":
     except Exception as exc:
         st.caption(f"Unable to load citations: {exc}")
 
-if _nav == "Data Layers":
+with tab_data:
     # -------------------- Dataset connection status (bottom of page) --------------------
     try:
         ds_status = check_dataset_connection()
