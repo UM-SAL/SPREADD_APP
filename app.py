@@ -178,7 +178,7 @@ import pathlib
 # R2 bucket (see r2_data.py + prepare_r2_tiles.py). No Hugging Face / rasterio needed.
 HF_DATASET_ID = "UniversityOfMontanaSAL/Full_Rasters"  # provenance only (shown in status)
 # Diagram image ships in the repo root (mounted by index.html for stlite).
-DIAGRAM_FILENAME = "SPREADD_diagram_v2.png"
+DIAGRAM_FILENAME = "Risk_Decision_Tree.png"
 
 st.title("S.P.R.E.A.D.D.")
 st.markdown("#### Spatial Probability of Risk from Environmental Action Driven Dispersal")
@@ -340,7 +340,7 @@ VALID_MODEL_TREATMENTS = base_treatments[:]  # only the real treatments (no plac
 
 # -------------------- Page tabs (Instructions / Map / Data Layers / About) --------------------
 tab_instructions, tab_map, tab_data, tab_about = st.tabs(
-    ["📖 Instructions", "🗺️ Map", "🗂️ Data Layers", "ℹ️ About"]
+    ["Instructions", "Map", "Data Layers", "About"]
 )
 
 with tab_instructions:
@@ -358,21 +358,21 @@ with tab_instructions:
         "feature** to load a shapefile (.zip), GeoJSON, GeoPackage (.gpkg) or file "
         "geodatabase (.gdb)."
     )
-    st.info("🎞️ Demo clip for Step 1 will appear here.")
+    st.info("Demo clip for Step 1 will appear here.")
 
     st.markdown("#### 2. Select your area(s)")
     st.markdown(
         "If you uploaded data, click polygons on the map to select them (or choose "
         "*All polygons*) and pick the unique-ID column. Drawn polygons are used directly."
     )
-    st.info("🎞️ Demo clip for Step 2 will appear here.")
+    st.info("Demo clip for Step 2 will appear here.")
 
     st.markdown("#### 3. Set the model inputs")
     st.markdown(
         "Assign a management action (treatment) to each area and choose the proliferation "
         "column under **Model Inputs**."
     )
-    st.info("🎞️ Demo clip for Step 3 will appear here.")
+    st.info("Demo clip for Step 3 will appear here.")
 
     st.markdown("#### 4. Run and review")
     st.markdown(
@@ -380,7 +380,7 @@ with tab_instructions:
         "the per-pixel threat maps, and the interactive satellite view. Use the download "
         "buttons to export results."
     )
-    st.info("🎞️ Demo clip for Step 4 will appear here.")
+    st.info("Demo clip for Step 4 will appear here.")
 
     st.caption(
         "The clip placeholders above are ready for short demo GIFs (one per step). "
@@ -395,18 +395,22 @@ with tab_data:
         "~98 m analysis grid (EPSG:5070, NAD83 / Conus Albers). Treatment effect (B) and "
         "rate of proliferation (C) come from lookup tables, not spatial layers."
     )
-    _data_layers_df = pd.DataFrame(
-        [
-            {"Model input": "A – Habitat suitability", "Dataset": "INHABIT invasive plant habitat suitability", "Source": "USGS — Jarnevich et al. 2024", "Vintage": "2024", "Prepared for app": "Nov 2026"},
-            {"Model input": "D – Human influence", "Dataset": "Human Influence Index (HII), Last of the Wild v2", "Source": "WCS & CIESIN, Columbia Univ.", "Vintage": "2005", "Prepared for app": "Nov 2026"},
-            {"Model input": "D – Biodiversity intactness", "Dataset": "Biodiversity Intactness Index (BII)", "Source": "Newbold et al. 2016 (NHM)", "Vintage": "2016", "Prepared for app": "Nov 2026"},
-            {"Model input": "D – Climate velocity", "Dataset": "AdaptWest velocity of climate change (CMIP6)", "Source": "AdaptWest; Loarie et al. 2009", "Vintage": "CMIP6", "Prepared for app": "Nov 2026"},
-        ]
+    st.markdown(
+        "| Model input | Dataset (click to open source) | Data year | Last pulled into app |\n"
+        "|---|---|---|---|\n"
+        "| A - Habitat suitability | [INHABIT invasive plant habitat suitability (USGS, Jarnevich et al. 2024)]"
+        "(https://doi.org/10.3897/neobiota.96.134842) | 2024 | Nov 2026 |\n"
+        "| D - Human influence | [Human Influence Index (HII), Last of the Wild v2 (WCS & CIESIN)]"
+        "(https://doi.org/10.7927/H4BP00QC) | 2005 | Nov 2026 |\n"
+        "| D - Biodiversity intactness | [Biodiversity Intactness Index (BII), Newbold et al. 2016]"
+        "(https://doi.org/10.1126/science.aaf2201) | 2016 | Nov 2026 |\n"
+        "| D - Climate velocity | [AdaptWest velocity of climate change (CMIP6)]"
+        "(https://adaptwest.databasin.org/pages/adaptwest-velocitywna/) | 2023 | Nov 2026 |\n"
     )
-    st.dataframe(_data_layers_df, hide_index=True, use_container_width=True)
     st.caption(
-        "'Prepared for app' is when the layer was last pulled and tiled into this tool. "
-        "Full source citations are listed on the About tab. Note the HII layer is from 2005."
+        "**Data year** = the year the dataset represents or was published. "
+        "**Last pulled into app** = when we downloaded and processed the layer into this tool. "
+        "Note the HII layer is from 2005. Full citations are on the About tab."
     )
 
 with tab_map:
@@ -544,7 +548,7 @@ with tab_map:
                         and st.session_state["upload_attr_edits"].get("file") == uploaded_file.name
                     )
                     edit_mode = st.toggle(
-                        "✏️ Edit attributes",
+                        "Edit attributes",
                         key="upload_edit_mode",
                         help="Edit attribute values (e.g. Unit Number) before running. Geometry is not editable here.",
                     )
@@ -560,7 +564,7 @@ with tab_map:
                             key="upload_attr_editor",
                         )
                         c1, c2 = st.columns(2)
-                        if c1.button("💾 Save edits", key="upload_attr_save"):
+                        if c1.button("Save edits", key="upload_attr_save"):
                             st.session_state["upload_attr_edits"] = {
                                 "file": uploaded_file.name,
                                 "n": len(uploaded_gdf),
@@ -568,7 +572,7 @@ with tab_map:
                             }
                             st.success("Edits saved — they'll be used for selection and the model run.")
                             st.rerun()
-                        if _edited_flag and c2.button("↩️ Revert to original", key="upload_attr_revert"):
+                        if _edited_flag and c2.button("Revert to original", key="upload_attr_revert"):
                             st.session_state.pop("upload_attr_edits", None)
                             st.rerun()
                     else:
@@ -1790,7 +1794,7 @@ with tab_map:
         cached_sig = cache.get("signature")
         if cached_sig is not None and cached_sig != _results_input_signature():
             st.warning(
-                "⚠️ Inputs have changed since these results were generated — "
+                "Inputs have changed since these results were generated — "
                 "they may be out of date. Click **Run** to update."
             )
 
@@ -1942,10 +1946,50 @@ with tab_map:
         use_basemap = show_basemap and ctx_mod is not None
         alpha = 0.6 if use_basemap else 1.0
 
+        cmap = plt.get_cmap("YlOrRd")
+        fixed_norm = colors.Normalize(vmin=0.0, vmax=2.0)
+
+        # --- Interactive satellite view FIRST (Esri World Imagery; browser-native basemap) ---
+        # contextily can't fetch tiles in Pyodide, so overlay the threat grid on a Folium map.
+        try:
+            import base64
+            from shapely.geometry import box as _box
+
+            st.markdown("**Interactive satellite view**")
+            sp_map = st.selectbox(
+                "Species to overlay on satellite imagery", ordered, key="viz_folium_species"
+            )
+            _mdata = _np.ma.masked_invalid(results[sp_map])
+            rgba = cmap(fixed_norm(_mdata))  # fixed 0-2 scale (matches the comparison grid)
+            rgba[..., 3] = _np.where(_np.isfinite(results[sp_map]), 0.75, 0.0)  # transparent where no data
+            png_buf = io.BytesIO()
+            plt.imsave(png_buf, (rgba * 255).astype("uint8"), format="png")
+            data_uri = "data:image/png;base64," + base64.b64encode(png_buf.getvalue()).decode()
+
+            # Grid bounds (EPSG:5070) -> lat/lon for the overlay. Small polygons: skew negligible.
+            w_, s_, e_, n_ = (
+                gpd.GeoSeries([_box(minx, miny, maxx, maxy)], crs=meta["crs"])
+                .to_crs("EPSG:4326")
+                .total_bounds
+            )
+            fmap = folium.Map(tiles=None)
+            folium.TileLayer(
+                tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                attr="Esri", name="Satellite",
+            ).add_to(fmap)
+            folium.raster_layers.ImageOverlay(
+                image=data_uri, bounds=[[s_, w_], [n_, e_]], opacity=0.75, name=sp_map
+            ).add_to(fmap)
+            fmap.fit_bounds([[s_, w_], [n_, e_]])
+            st_folium(fmap, use_container_width=True, height=500, key="viz_folium_map")
+            st.caption("Overlay is reprojected from the ~98 m grid; alignment is approximate.")
+        except Exception as exc:
+            st.caption(f"Satellite overlay unavailable: {exc}")
+
+        # --- All-species side-by-side comparison grid ---
+        st.markdown("**All species (side-by-side comparison)**")
         ncols = 4
         nrows = int(_np.ceil(len(ordered) / ncols))
-        fixed_norm = colors.Normalize(vmin=0.0, vmax=2.0)
-        cmap = plt.get_cmap("YlOrRd")
         fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 3, nrows * 3))
         axes = _np.atleast_1d(axes).ravel()
         for j in range(len(ordered), len(axes)):
@@ -1995,6 +2039,7 @@ with tab_map:
         st.pyplot(fig)
         plt.close(fig)
 
+        # --- Download the per-pixel threat grids ---
         try:
             buf = io.BytesIO()
             with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -2016,43 +2061,6 @@ with tab_map:
         except Exception as exc:
             st.caption(f"Grid export unavailable: {exc}")
 
-        # Interactive satellite view: contextily can't fetch tiles in the browser, so overlay
-        # the threat grid on a Folium map (Esri World Imagery loads directly in the browser).
-        try:
-            import base64
-            from shapely.geometry import box as _box
-
-            st.markdown("**Interactive satellite view**")
-            sp_map = st.selectbox(
-                "Species to overlay on satellite imagery", ordered, key="viz_folium_species"
-            )
-            data = _np.ma.masked_invalid(results[sp_map])
-            rgba = cmap(fixed_norm(data))  # (h, w, 4) floats, fixed 0-2 scale (matches grid above)
-            rgba[..., 3] = _np.where(_np.isfinite(results[sp_map]), 0.75, 0.0)  # transparent where no data
-            png_buf = io.BytesIO()
-            plt.imsave(png_buf, (rgba * 255).astype("uint8"), format="png")
-            data_uri = "data:image/png;base64," + base64.b64encode(png_buf.getvalue()).decode()
-
-            # Grid bounds (EPSG:5070) -> lat/lon for the overlay. Small polygons: skew negligible.
-            w, s, e, n = (
-                gpd.GeoSeries([_box(minx, miny, maxx, maxy)], crs=meta["crs"])
-                .to_crs("EPSG:4326")
-                .total_bounds
-            )
-            fmap = folium.Map(tiles=None)
-            folium.TileLayer(
-                tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-                attr="Esri", name="Satellite",
-            ).add_to(fmap)
-            folium.raster_layers.ImageOverlay(
-                image=data_uri, bounds=[[s, w], [n, e]], opacity=0.75, name=sp_map
-            ).add_to(fmap)
-            fmap.fit_bounds([[s, w], [n, e]])
-            st_folium(fmap, use_container_width=True, height=500, key="viz_folium_map")
-            st.caption("Overlay is reprojected from the ~98 m grid; alignment is approximate.")
-        except Exception as exc:
-            st.caption(f"Satellite overlay unavailable: {exc}")
-
 
     try:
         render_per_pixel_maps()
@@ -2060,93 +2068,15 @@ with tab_map:
         st.caption(f"Per-pixel maps unavailable: {_viz_exc}")
 
 with tab_about:
-    # -------------------- How the model works (decision tree) --------------------
-    def render_model_diagram():
-        """Draw the current A+B+C+D model as a diagram (auto-matches the code constants)."""
-        import matplotlib.pyplot as plt
-        from matplotlib.patches import Rectangle
-
-        try:
-            from rebekahs_model import (
-                HII_MAX_CLASS,
-                CLIM_VELOCITY_CAP_KM_YR,
-                RISK_CLASS_BREAKS,
-                RISK_CLASS_LABELS,
-            )
-        except Exception:
-            HII_MAX_CLASS, CLIM_VELOCITY_CAP_KM_YR = 50.0, 7.0
-            RISK_CLASS_BREAKS = (0.8, 1.0, 1.2, 1.4)
-            RISK_CLASS_LABELS = (
-                "Very Low Risk", "Low Risk", "Medium Risk", "High Risk", "Very High Risk",
-            )
-
-        fig, ax = plt.subplots(figsize=(11, 6.4))
-        ax.set_xlim(0, 100)
-        ax.set_ylim(0, 100)
-        ax.axis("off")
-
-        def box(x, y, w, h, title, body, fc):
-            ax.add_patch(Rectangle((x, y), w, h, facecolor=fc, edgecolor="#333", linewidth=1.2))
-            ax.text(x + w / 2, y + h - 3, title, ha="center", va="top", fontsize=10, fontweight="bold")
-            ax.text(x + w / 2, y + h - 9, body, ha="center", va="top", fontsize=8)
-
-        box(1, 62, 22, 34, "A · Habitat suitability", "species map ÷ 100\n(0–1, per pixel)", "#e8f4ea")
-        box(25.5, 62, 22, 34, "B · Treatment effect", "from management\nlookup table\n(0–1)", "#e8eef7")
-        box(50, 62, 22, 34, "C · Spread potential", "rate of proliferation\n(Final Output table)", "#f7f0e8")
-        box(
-            74.5, 62, 24.5, 34, "D · Site vulnerability",
-            f"mean of 3 scores (0–1):\n• Human influence ÷ {HII_MAX_CLASS:g}\n"
-            f"• Biodiversity lost = 1 − BII/100\n• Climate velocity ÷ {CLIM_VELOCITY_CAP_KM_YR:g}",
-            "#f7e8ee",
-        )
-
-        box(30, 34, 40, 15, "TOTAL RISK", "A + B + C + D", "#efeff2")
-        for cx in (12, 36.5, 61, 86.75):
-            ax.annotate("", xy=(50, 49), xytext=(cx, 62), arrowprops=dict(arrowstyle="->", color="#777", lw=1))
-        ax.annotate("", xy=(50, 24), xytext=(50, 34), arrowprops=dict(arrowstyle="->", color="#777", lw=1.3))
-
-        labels = [l.replace(" Risk", "") for l in RISK_CLASS_LABELS]
-        breaks = list(RISK_CLASS_BREAKS)
-        edges = [breaks[0] - 0.2] + breaks + [breaks[-1] + 0.2]
-        seg_colors = ["#1a9850", "#a6d96a", "#fee08b", "#fc8d59", "#d73027"]
-        bar_x0, bar_w = 8, 84
-        lo, hi = edges[0], edges[-1]
-        for i in range(5):
-            x = bar_x0 + (edges[i] - lo) / (hi - lo) * bar_w
-            w = (edges[i + 1] - edges[i]) / (hi - lo) * bar_w
-            ax.add_patch(Rectangle((x, 10), w, 6, facecolor=seg_colors[i], edgecolor="white"))
-            ax.text(x + w / 2, 13, labels[i], ha="center", va="center", fontsize=7.5)
-        for b in breaks:
-            x = bar_x0 + (b - lo) / (hi - lo) * bar_w
-            ax.plot([x, x], [9, 17], color="#333", lw=0.8)
-            ax.text(x, 7.5, f"{b:g}", ha="center", va="top", fontsize=7)
-        ax.text(50, 2, "Total score → risk class", ha="center", fontsize=8, color="#555")
-        fig.tight_layout()
-        return fig
-
-
-    def _show_auto_diagram():
-        try:
-            import matplotlib.pyplot as _plt_diag
-
-            _fig = render_model_diagram()
-            st.pyplot(_fig)
-            _plt_diag.close(_fig)
-        except Exception as _diag_exc:
-            st.caption(f"Model diagram unavailable: {_diag_exc}")
-
-
+    # -------------------- How the model works --------------------
     st.divider()
     st.subheader("How the model works")
-    _diagram_path = _find_decision_tree_image()  # bundled PNG in the repo root
-    if _diagram_path:
-        st.image(_diagram_path, use_container_width=True)
-        with st.expander("Code-generated version (auto-matches the model constants)", expanded=False):
-            _show_auto_diagram()
-    else:
-        _show_auto_diagram()
+    try:
+        st.image(DIAGRAM_FILENAME, use_container_width=True)
+    except Exception as _img_exc:
+        st.caption(f"Model diagram unavailable: {_img_exc}")
     st.caption(
-        "Total risk = A + B + C + D (each 0–1; B and C from lookup tables). Higher "
+        "Total risk = A + B + C + D (each 0-1; B and C from lookup tables). Higher "
         "biodiversity intactness lowers risk. Class breaks are provisional."
     )
 
@@ -2217,19 +2147,19 @@ with tab_data:
     # -------------------- Dataset connection status (bottom of page) --------------------
     try:
         ds_status = check_dataset_connection()
-        status_msg = f"✅ **Rasters connected:** Cloudflare R2 (`{len(ds_status['files'])}` layers)"
+        status_msg = f"**Rasters connected:** Cloudflare R2 (`{len(ds_status['files'])}` layers)"
         try:
             raster_info_for_check = get_raster_paths()
             missing_req = _missing_required_rasters(raster_info_for_check)
             if missing_req:
-                status_msg += f"  \n⚠️ Missing resistance rasters: `{', '.join(missing_req)}`"
+                status_msg += f"  \nMissing resistance rasters: `{', '.join(missing_req)}`"
             else:
                 status_msg += "  \n`Resistance rasters:` HII, Biodiversity, Clim_Velocity"
         except Exception as raster_exc:
             status_msg += f"  \n`Raster check unavailable:` `{raster_exc}`"
         dataset_status_md = status_msg
     except Exception as exc:
-        dataset_status_md = f"⚠️ **Raster bucket not reachable:** `{R2_BASE_URL}` — {exc}"
+        dataset_status_md = f"**Raster bucket not reachable:** `{R2_BASE_URL}` — {exc}"
 
     if dataset_status_md:
         st.divider()
