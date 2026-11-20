@@ -1211,21 +1211,32 @@ with tab_map:
             for msg in existing_polygon_errors:
                 st.error(msg)
 
-    # Use an on_click callback to set a session-state flag instead of relying on the
-    # button's return value, which is unreliable for st.button inside st.tabs.
-    def _mark_run():
+    # st.button is inert inside stlite tabs. EXPERIMENT: test which trigger actually fires
+    # so we can keep the one that works and drop the rest.
+    def _request_run():
         st.session_state["_run_requested"] = True
-        st.session_state["_run_clicks"] = st.session_state.get("_run_clicks", 0) + 1
 
-    st.button(
-        "Run prediction",
-        disabled=not ready_to_run,
-        key="run_prediction",
-        on_click=_mark_run,
-        type="primary",
+    def _btn_cb():
+        _request_run()
+        st.session_state["_cnt_btn"] = st.session_state.get("_cnt_btn", 0) + 1
+
+    _c_btn, _c_form, _c_tog = st.columns(3)
+    with _c_btn:
+        st.button("Run (button)", disabled=not ready_to_run, key="run_btn", on_click=_btn_cb)
+    with _c_form:
+        with st.form("run_form"):
+            if st.form_submit_button("Run (form)", disabled=not ready_to_run):
+                _request_run()
+                st.session_state["_cnt_form"] = st.session_state.get("_cnt_form", 0) + 1
+    with _c_tog:
+        if st.toggle("Run (toggle)", key="run_toggle", disabled=not ready_to_run):
+            _request_run()
+            st.session_state["_cnt_tog"] = st.session_state.get("_cnt_tog", 0) + 1
+    st.caption(
+        f"(debug) counters — button={st.session_state.get('_cnt_btn', 0)} "
+        f"form={st.session_state.get('_cnt_form', 0)} "
+        f"toggle={st.session_state.get('_cnt_tog', 0)} · ready_to_run={ready_to_run}"
     )
-    # TEMP diagnostic: proves whether the button click is registering at all.
-    st.caption(f"(debug) Run clicks registered: {st.session_state.get('_run_clicks', 0)} · ready_to_run={ready_to_run}")
     if not ready_to_run:
         st.caption(
             "Run is disabled until: a treatment is chosen, a C (proliferation) column is "
