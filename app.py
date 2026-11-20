@@ -172,19 +172,21 @@ def _results_to_long_gdf(species_df, zones_gdf, uid_name="zone_id"):
 
 
 def _render_vector_downloads():
-    """Render the polygon-results download button from cached export bytes, so it persists
+    """Render the polygon-results download buttons from cached export bytes, so they persist
     across the rerun that a download-button click triggers."""
     ex = st.session_state.get("vector_exports")
     if not ex:
         return
     st.markdown("**Download result polygons** (one feature per polygon × species)")
-    st.download_button(
-        "GeoJSON (.geojson)",
-        data=ex["geojson"],
-        file_name="spreadd_results.geojson",
-        mime="application/geo+json",
-        key="dl_geojson",
-        use_container_width=True,
+    _pc1, _pc2 = st.columns(2)
+    if ex.get("shp"):
+        _pc1.download_button(
+            "Shapefile (.zip)", data=ex["shp"], file_name="spreadd_results_shp.zip",
+            mime="application/zip", key="dl_shp", use_container_width=True,
+        )
+    _pc2.download_button(
+        "GeoJSON (.geojson)", data=ex["geojson"], file_name="spreadd_results.geojson",
+        mime="application/geo+json", key="dl_geojson", use_container_width=True,
     )
 
 
@@ -196,6 +198,58 @@ def _vector_export_bytes(gdf):
     except Exception:
         pass
     return gdf.to_json().encode("utf-8")
+
+
+def _shapefile_zip_bytes(gdf):
+    """Return a zipped ESRI Shapefile (.shp/.shx/.dbf/.prj/.cpg) for a polygon GeoDataFrame,
+    written with pyshp (pure Python) — NOT fiona.to_file, which crashes the Pyodide worker.
+    Returns None on failure so the caller can still offer GeoJSON."""
+    try:
+        import io as _io, zipfile as _zip
+        import shapefile  # pyshp
+        from shapely.geometry.polygon import orient
+
+        shp, shx, dbf = _io.BytesIO(), _io.BytesIO(), _io.BytesIO()
+        w = shapefile.Writer(shp=shp, shx=shx, dbf=dbf, shapeType=shapefile.POLYGON)
+        geom_name = gdf.geometry.name
+        attr_cols = [c for c in gdf.columns if c != geom_name]
+        for c in attr_cols:
+            dt = gdf[c].dtype
+            if pd.api.types.is_integer_dtype(dt):
+                w.field(str(c)[:10], "N", 18, 0)
+            elif pd.api.types.is_float_dtype(dt):
+                w.field(str(c)[:10], "N", 20, 6)
+            else:
+                w.field(str(c)[:10], "C", 200)
+        for _, row in gdf.iterrows():
+            geom = row[geom_name]
+            if geom is None or getattr(geom, "is_empty", True):
+                w.null()
+            else:
+                polys = geom.geoms if geom.geom_type == "MultiPolygon" else [geom]
+                parts = []
+                for poly in polys:
+                    poly = orient(poly, sign=-1.0)  # exterior CW, holes CCW (shapefile spec)
+                    parts.append([(x, y) for x, y in poly.exterior.coords])
+                    parts += [[(x, y) for x, y in r.coords] for r in poly.interiors]
+                w.poly(parts)
+            w.record(*[(None if pd.isna(row[c]) else row[c]) for c in attr_cols])
+        w.close()
+        try:
+            prj = gdf.crs.to_wkt() if gdf.crs else ""
+        except Exception:
+            prj = ""
+        buf = _io.BytesIO()
+        with _zip.ZipFile(buf, "w", _zip.ZIP_DEFLATED) as zf:
+            zf.writestr("spreadd_results.shp", shp.getvalue())
+            zf.writestr("spreadd_results.shx", shx.getvalue())
+            zf.writestr("spreadd_results.dbf", dbf.getvalue())
+            zf.writestr("spreadd_results.cpg", "UTF-8")
+            if prj:
+                zf.writestr("spreadd_results.prj", prj)
+        return buf.getvalue()
+    except Exception:
+        return None
 
 
 def _ensure_gdf_crs(gdf: gpd.GeoDataFrame, default_crs: str = "EPSG:4326") -> gpd.GeoDataFrame:
@@ -1854,7 +1908,10 @@ with tab_map:
         # Build the bytes once and cache them so the buttons survive download-click reruns.
         try:
             _long_gdf = _results_to_long_gdf(species_df, zones_gdf, out_uid_field)
-            st.session_state["vector_exports"] = {"geojson": _vector_export_bytes(_long_gdf)}
+            st.session_state["vector_exports"] = {
+                "geojson": _vector_export_bytes(_long_gdf),   # pure-Python GeoJSON
+                "shp": _shapefile_zip_bytes(_long_gdf),       # pure-Python Shapefile (pyshp)
+            }
         except Exception as _vexc:
             st.session_state.pop("vector_exports", None)
             st.caption(f"Polygon export unavailable: {_vexc}")

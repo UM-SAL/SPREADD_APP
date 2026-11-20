@@ -615,29 +615,64 @@ def array_to_asc_bytes(array, transform, crs=None) -> bytes:
 
 
 def array_to_geotiff_bytes(array, transform, crs_epsg: int = 5070) -> bytes:
-    """Encode a 2D float array as an in-memory GeoTIFF using tifffile (pure Python, no GDAL).
+    """Encode a 2D float array as a single-band float32 GeoTIFF using only the stdlib
+    ``struct`` module — no tifffile/rasterio/GDAL (those aren't browser-installable).
 
-    Writes the standard GeoTIFF tags (GeoKeyDirectory + ModelPixelScale + ModelTiepoint)
-    for a north-up grid in the given projected EPSG (default 5070, NAD83 / Conus Albers),
-    with NaN as the GDAL nodata value. Verified to round-trip through rasterio.
+    Writes a north-up, uncompressed, single-strip image plus the standard GeoTIFF tags
+    (GeoKeyDirectory + ModelPixelScale + ModelTiepoint) for the given projected EPSG
+    (default 5070, NAD83 / Conus Albers), with NaN as the GDAL nodata value. Verified to
+    round-trip through rasterio.
     """
-    import io
-    import tifffile
+    import struct
 
-    arr = np.asarray(array, dtype="float32")
-    sx = float(transform.a)            # pixel size x
-    sy = float(abs(transform.e))       # pixel size y
-    ulx = float(transform.c)           # upper-left x
-    uly = float(transform.f)           # upper-left y
-    # GeoKeyDirectory: (version 1,1,0, num_keys), then key entries:
-    #   GTModelType(1024)=1 (projected), GTRasterType(1025)=1 (area), ProjectedCSType(3072)=epsg
-    geokeys = (1, 1, 0, 3, 1024, 0, 1, 1, 1025, 0, 1, 1, 3072, 0, 1, int(crs_epsg))
-    extratags = [
-        (34735, "H", len(geokeys), geokeys),              # GeoKeyDirectoryTag
-        (33550, "d", 3, (sx, sy, 0.0)),                   # ModelPixelScaleTag
-        (33922, "d", 6, (0.0, 0.0, 0.0, ulx, uly, 0.0)),  # ModelTiepointTag (0,0 -> ul)
-        (42113, "s", 0, "nan"),                           # GDAL_NODATA
+    arr = np.where(np.isfinite(array), array, np.float32("nan")).astype("<f4")
+    arr = np.ascontiguousarray(arr)
+    h, w = arr.shape
+    sx = float(transform.a)         # pixel size x
+    sy = float(abs(transform.e))    # pixel size y
+    ulx = float(transform.c)        # upper-left x
+    uly = float(transform.f)        # upper-left y
+    data = arr.tobytes()
+
+    # GeoKeyDirectory: (1,1,0,numkeys) then GTModelType=1, GTRasterType=1, ProjectedCSType=epsg
+    geokeys = [1, 1, 0, 3, 1024, 0, 1, 1, 1025, 0, 1, 1, 3072, 0, 1, int(crs_epsg)]
+    gk_bytes = struct.pack("<%dH" % len(geokeys), *geokeys)
+    px_bytes = struct.pack("<3d", sx, sy, 0.0)
+    tp_bytes = struct.pack("<6d", 0.0, 0.0, 0.0, ulx, uly, 0.0)
+
+    n_entries = 14
+    off_ifd = 8
+    ifd_size = 2 + n_entries * 12 + 4
+    off_px = off_ifd + ifd_size
+    off_tp = off_px + len(px_bytes)
+    off_gk = off_tp + len(tp_bytes)
+    off_img = off_gk + len(gk_bytes)
+
+    def entry(tag, typ, count, valbytes):     # 12-byte IFD entry
+        return struct.pack("<HHI", tag, typ, count) + valbytes
+
+    def L(v):  # LONG value, inline
+        return struct.pack("<I", v)
+
+    def S(v):  # SHORT value (count 1), inline, left-justified
+        return struct.pack("<HH", v, 0)
+
+    entries = [
+        entry(256, 4, 1, L(w)),              # ImageWidth
+        entry(257, 4, 1, L(h)),              # ImageLength
+        entry(258, 3, 1, S(32)),             # BitsPerSample
+        entry(259, 3, 1, S(1)),              # Compression = none
+        entry(262, 3, 1, S(1)),              # Photometric = BlackIsZero
+        entry(273, 4, 1, L(off_img)),        # StripOffsets
+        entry(277, 3, 1, S(1)),              # SamplesPerPixel
+        entry(278, 4, 1, L(h)),              # RowsPerStrip
+        entry(279, 4, 1, L(len(data))),      # StripByteCounts
+        entry(339, 3, 1, S(3)),              # SampleFormat = IEEE float
+        entry(33550, 12, 3, L(off_px)),      # ModelPixelScaleTag
+        entry(33922, 12, 6, L(off_tp)),      # ModelTiepointTag
+        entry(34735, 3, len(geokeys), L(off_gk)),  # GeoKeyDirectoryTag
+        entry(42113, 2, 4, b"nan\x00"),      # GDAL_NODATA
     ]
-    buf = io.BytesIO()
-    tifffile.imwrite(buf, arr, extratags=extratags)
-    return buf.getvalue()
+    ifd = struct.pack("<H", n_entries) + b"".join(entries) + struct.pack("<I", 0)
+    header = b"II" + struct.pack("<HI", 42, off_ifd)
+    return header + ifd + px_bytes + tp_bytes + gk_bytes + data
