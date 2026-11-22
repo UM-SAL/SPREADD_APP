@@ -54,6 +54,28 @@ def fetch_r2_bytes(rel_path: str) -> bytes | None:
             return None
 
 
+def fetch_url_bytes(url: str, timeout: int = 30) -> bytes | None:
+    """Fetch any absolute URL as bytes (sync XHR in stlite, urllib on desktop). Used for the
+    Esri static-basemap export; returns None on failure so callers can degrade gracefully."""
+    try:
+        from js import XMLHttpRequest  # type: ignore
+
+        xhr = XMLHttpRequest.new()
+        xhr.open("GET", url, False)
+        xhr.responseType = "arraybuffer"
+        xhr.send(None)
+        if xhr.status == 200:
+            return bytes(xhr.response.to_py())
+        return None
+    except ImportError:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (SPREADD)"})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.read()
+        except Exception:
+            return None
+
+
 @lru_cache(maxsize=1)
 def get_r2_catalog() -> dict:
     """Load and cache catalog.json (grid CRS, affine transform, size, tile layout, stems)."""

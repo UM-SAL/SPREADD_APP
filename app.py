@@ -558,20 +558,16 @@ with tab_map:
 
     if input_mode == "Upload feature":
         st.subheader("Upload a shapefile or polygon file")
-        st.caption(
-            "**Accepted formats:**\n"
-            "- `.geojson` / `.json`\n"
-            "- Zipped shapefile (`.zip`)\n"
-            "- `.gpkg` (GeoPackage)\n"
-            "- Zipped File Geodatabase (`.gdb.zip`)\n"
-            "\n"
-            "**Notes:**\n"
-            "- Only polygon layers are displayed.\n"
-            "- Data is reprojected to WGS84 (EPSG:4326) for mapping.\n"
-            "- For best reliability, use **GeoPackage (`.gpkg`)**."
+        uploaded_file = st.file_uploader(
+            "Upload geometry",
+            type=["zip", "geojson", "json", "gpkg", "kml", "kmz"],
+            help=(
+                "Accepted formats: zipped shapefile (.zip), GeoJSON (.geojson / .json), "
+                "GeoPackage (.gpkg), zipped file geodatabase (.gdb.zip), and KML / KMZ "
+                "(.kml / .kmz). Uploaded data is reprojected to WGS84 (EPSG:4326) for "
+                "display on the map."
+            ),
         )
-
-        uploaded_file = st.file_uploader("Upload geometry", type=["zip", "geojson", "json", "gpkg"])
 
         if uploaded_file and st.session_state.get("upload_last_filename") != uploaded_file.name:
             st.session_state.upload_selected_ids = set()
@@ -589,6 +585,15 @@ with tab_map:
                         data_path = os.path.join(tmpdir, uploaded_file.name)
                         with open(data_path, "wb") as f:
                             f.write(uploaded_file.getbuffer())
+                    elif name.endswith(".kmz"):
+                        # KMZ is a zipped KML — extract and use the first .kml inside.
+                        zpath = os.path.join(tmpdir, uploaded_file.name)
+                        with open(zpath, "wb") as f:
+                            f.write(uploaded_file.getbuffer())
+                        with zipfile.ZipFile(zpath, "r") as zf:
+                            zf.extractall(tmpdir)
+                        _kmls = glob.glob(os.path.join(tmpdir, "**", "*.kml"), recursive=True)
+                        data_path = _kmls[0] if _kmls else None
                     elif name.endswith(".zip"):
                         zpath = os.path.join(tmpdir, uploaded_file.name)
                         with open(zpath, "wb") as f:
@@ -602,8 +607,17 @@ with tab_map:
                             f.write(uploaded_file.getbuffer())
 
                     if not data_path:
-                        st.error("Could not find a .gdb, .gpkg, or .shp inside the upload.")
+                        st.error("Could not find a .gdb, .gpkg, .shp or .kml inside the upload.")
                     else:
+                        # Enable KML/LIBKML drivers for .kml/.kmz (best effort; the browser
+                        # GDAL build may not include them).
+                        if data_path.lower().endswith(".kml"):
+                            try:
+                                import fiona
+                                fiona.drvsupport.supported_drivers["KML"] = "rw"
+                                fiona.drvsupport.supported_drivers["LIBKML"] = "rw"
+                            except Exception:
+                                pass
                         layer_choice = None
                         layer_names = []
                         if data_path.lower().endswith((".gdb", ".gpkg")) and HAS_PYOGRIO:
@@ -710,6 +724,16 @@ with tab_map:
     st.subheader("Map")
 
     if input_mode == "Upload feature":
+        # Before a file is uploaded, show a base map of the model area for context (#3).
+        if uploaded_gdf_4326 is None or uploaded_gdf_4326.empty:
+            _ext = get_raster_extent_4326()
+            _basemap = folium.Map(tiles="OpenStreetMap")
+            if _ext and _ext.get("bounds_4326"):
+                _w, _s, _e, _n = _ext["bounds_4326"]
+                _basemap.fit_bounds([[_s, _w], [_n, _e]])
+            st_folium(_basemap, use_container_width=True, height=500, key="map_upload_base")
+            st.caption("Upload a polygon file above to begin.")
+
         # New polygon selection map (replaces legacy single-select map)
         if uploaded_gdf_4326 is not None and not uploaded_gdf_4326.empty:
             non_geom_cols = [c for c in uploaded_gdf_4326.columns if c not in ["geometry", "__fid__"]]
@@ -2126,6 +2150,54 @@ with tab_map:
             fmap.fit_bounds([[s_, w_], [n_, e_]])
             st_folium(fmap, use_container_width=True, height=500, key="viz_folium_map")
             st.caption("Overlay is reprojected from the ~98 m grid; alignment is approximate.")
+
+            # Static image report: Esri satellite basemap + overlay + colour-scale legend,
+            # fetched as a single export image so it can be downloaded/printed/shared (#5).
+            try:
+                from r2_data import fetch_url_bytes
+
+                _wpx = 900
+                _span_x = max(1e-9, e_ - w_)
+                _hpx = int(min(1400, max(300, round(_wpx * (n_ - s_) / _span_x))))
+                _esri = (
+                    "https://server.arcgisonline.com/arcgis/rest/services/World_Imagery/"
+                    f"MapServer/export?bbox={w_},{s_},{e_},{n_}&bboxSR=4326&imageSR=4326"
+                    f"&size={_wpx},{_hpx}&format=png&transparent=false&f=image"
+                )
+                _bm = fetch_url_bytes(_esri)
+                _rfig, _rax = plt.subplots(figsize=(7.5, 7.5 * _hpx / _wpx + 0.6))
+                if _bm:
+                    _rax.imshow(plt.imread(io.BytesIO(_bm)), extent=[w_, e_, s_, n_],
+                                origin="upper", zorder=1)
+                else:
+                    _rax.set_facecolor("#dddddd")
+                _rax.imshow(rgba, extent=[w_, e_, s_, n_], origin="upper", zorder=2,
+                            interpolation="nearest")
+                _rax.set_xlim(w_, e_)
+                _rax.set_ylim(s_, n_)
+                _rax.set_title(f"{sp_map} — total risk (A+B+C+D)", fontsize=10)
+                _rax.set_xticks([])
+                _rax.set_yticks([])
+                _rfig.colorbar(
+                    cm.ScalarMappable(norm=fixed_norm, cmap=cmap), ax=_rax,
+                    fraction=0.045, pad=0.02, label="Total risk (low → high)",
+                )
+                _rbuf = io.BytesIO()
+                _rfig.savefig(_rbuf, format="png", dpi=150, bbox_inches="tight")
+                plt.close(_rfig)
+                _safe_sp = re.sub(r"[^A-Za-z0-9]+", "_", sp_map)
+                st.download_button(
+                    "Download satellite map image (PNG)",
+                    data=_rbuf.getvalue(),
+                    file_name=f"satellite_map_zone{sel_zone}_{_safe_sp}.png",
+                    mime="image/png",
+                    key="viz_dl_report",
+                    use_container_width=True,
+                )
+                if not _bm:
+                    st.caption("(Satellite basemap couldn't be fetched; exported overlay only.)")
+            except Exception as _rep_exc:
+                st.caption(f"Image report unavailable: {_rep_exc}")
         except Exception as exc:
             st.caption(f"Satellite overlay unavailable: {exc}")
 
